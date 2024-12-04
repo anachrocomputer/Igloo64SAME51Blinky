@@ -6,7 +6,7 @@ The board has nine big LEDs, and this code blinks them.
 ## Connections ##
 
 | LED | SAM E51 pin | Name |
-+-----+-------------+------+
+|-----|-------------|------|
 | D1  |             |      |
 | D2  |             |      |
 | D3  |             |      |
