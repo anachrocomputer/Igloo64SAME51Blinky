@@ -66,7 +66,15 @@ void main(void)
     
     while (1)
     {
-        for (i = 0; i < 9; i++)
+        for (i = 0; i < 8; i++)
+        {
+            oneLedOn(i);
+            
+            for (dally = 0; dally < 500000; dally++)
+                ;
+        }
+        
+        for (i = 8; i > 0; i--)
         {
             oneLedOn(i);
             
