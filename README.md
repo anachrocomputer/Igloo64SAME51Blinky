@@ -1,3 +1,6 @@
+![Static Badge](https://img.shields.io/badge/MCU-ATSAME51-green "MCU:ATSAME51")
+![Static Badge](https://img.shields.io/badge/BOARD-Igloo64-green "BOARD:Igloo64")
+
 # Igloo64SAME51Blinky #
 
 Firmware for Atmel/Microchip ATSAME51J20A microcontroller (ARM) on Igloo64 prototyping board.
