@@ -1,4 +1,5 @@
 ![Static Badge](https://img.shields.io/badge/MCU-ATSAME51-green "MCU:ATSAME51")
+![Static Badge](https://img.shields.io/badge/IDE-MPLAB_X_V6.20-green "IDE:MPLAB_X_V6.20")
 ![Static Badge](https://img.shields.io/badge/BOARD-Igloo64-green "BOARD:Igloo64")
 
 # Igloo64SAME51Blinky #
@@ -24,6 +25,6 @@ GPIO pin assignments are by physical proximity on the PCB.
 
 ## Compiling ##
 
-Code written in MPLAB X V6.05 and compiled with 'xc32' compiler V4.30.
+Code written in MPLAB X V6.20 and compiled with 'xc32' compiler V4.60.
 
 
