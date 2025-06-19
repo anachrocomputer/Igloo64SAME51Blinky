@@ -2,6 +2,7 @@
 
 
 #include <sam.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -23,11 +24,84 @@ void TC3_Handler(void)
 }
 
 
+/* t1ou --- send a byte to UART0 by polling */
+
+void t1ou(const int ch)
+{
+    while ((SERCOM0_REGS->USART_INT.SERCOM_INTFLAG & SERCOM_USART_INT_INTFLAG_DRE(1)) == 0)
+        ;
+    
+    SERCOM0_REGS->USART_INT.SERCOM_DATA = ch;
+}
+
+
+/* _mon_putc --- connect UART0 to 'stdout' */
+
+void _mon_putc(const char ch)
+{
+    if (ch == '\n')
+    {
+        t1ou('\r');
+    }
+    
+    t1ou(ch);
+}
+
+
 /* millis --- return milliseconds since reset */
 
 uint32_t millis(void)
 {
     return (Milliseconds);
+}
+
+
+/* initUARTs --- set up UART(s) and buffers */
+
+static void initUARTs(void)
+{
+    // Connect GCLK1 to SERCOM0
+    GCLK_REGS->GCLK_PCHCTRL[7] = GCLK_PCHCTRL_GEN(0x1U) | GCLK_PCHCTRL_CHEN_Msk;
+
+    while ((GCLK_REGS->GCLK_PCHCTRL[7] & GCLK_PCHCTRL_CHEN_Msk) != GCLK_PCHCTRL_CHEN_Msk)
+        ;
+    
+    // Main Clock setup to supply clock to SERCOM0
+    MCLK_REGS->MCLK_APBAMASK |= MCLK_APBAMASK_SERCOM0(1);
+
+    // Set up SERCOM0 as UART0
+    SERCOM0_REGS->USART_INT.SERCOM_CTRLA = SERCOM_USART_INT_CTRLA_TXPO_PAD0 |
+                                           SERCOM_USART_INT_CTRLA_RXPO_PAD1 |
+                                           SERCOM_USART_INT_CTRLA_FORM_USART_FRAME_NO_PARITY |
+                                           SERCOM_USART_INT_CTRLA_DORD_LSB |
+                                           SERCOM_USART_INT_CTRLA_CMODE_ASYNC |
+                                           SERCOM_USART_INT_CTRLA_SAMPR_16X_ARITHMETIC |
+                                           SERCOM_USART_INT_CTRLA_MODE_USART_INT_CLK;
+    
+    while (SERCOM0_REGS->USART_INT.SERCOM_SYNCBUSY & SERCOM_USART_INT_SYNCBUSY_CTRLB(1))
+        ;
+    
+    SERCOM0_REGS->USART_INT.SERCOM_CTRLB = SERCOM_USART_INT_CTRLB_CHSIZE_8_BIT |
+                                           SERCOM_USART_INT_CTRLB_SBMODE_1_BIT |
+                                           SERCOM_USART_INT_CTRLB_TXEN(1) |
+                                           SERCOM_USART_INT_CTRLB_RXEN(1);
+    while (SERCOM0_REGS->USART_INT.SERCOM_SYNCBUSY & SERCOM_USART_INT_SYNCBUSY_CTRLB(1))
+        ;
+    
+    SERCOM0_REGS->USART_INT.SERCOM_BAUD = 65326;    // 9600 baud from 48MHz GCLK
+    //SERCOM0_REGS->USART_INT.SERCOM_INTENSET = 0;
+
+    PORT_REGS->GROUP[0].PORT_PMUX[4] = PORT_PMUX_PMUXE_C | PORT_PMUX_PMUXO_C;
+    PORT_REGS->GROUP[0].PORT_PINCFG[8] = PORT_PINCFG_PMUXEN(1);  // PA08 pin 17 TxD
+    PORT_REGS->GROUP[0].PORT_PINCFG[9] = PORT_PINCFG_PMUXEN(1);  // PA90 pin 18 RxD
+    
+    while (SERCOM0_REGS->USART_INT.SERCOM_SYNCBUSY & SERCOM_USART_INT_SYNCBUSY_ENABLE(1))
+        ;
+    
+    SERCOM0_REGS->USART_INT.SERCOM_CTRLA |= SERCOM_USART_INT_CTRLA_ENABLE(1);
+    
+    while (SERCOM0_REGS->USART_INT.SERCOM_SYNCBUSY & SERCOM_USART_INT_SYNCBUSY_ENABLE(1))
+        ;
 }
 
 
@@ -203,6 +277,7 @@ void main(void)
     int i;
     
     initMCU();
+    initUARTs();
     initMillisecondTimer();
     
     PORT_REGS->GROUP[0].PORT_DIRSET = PORT_PA00;    // LED pins to outputs
@@ -215,11 +290,14 @@ void main(void)
     PORT_REGS->GROUP[0].PORT_DIRSET = PORT_PA18;
     PORT_REGS->GROUP[0].PORT_DIRSET = PORT_PA15;
     
+    printf("\nHello from the SAM%c%d%c%d%c\n", 'E', 51, 'J', 20, 'A');
+    
     while (1)
     {
         for (i = 0; i < 8; i++)
         {
             oneLedOn(i);
+            t1ou('A');
             
             t = millis();
             while((millis() - t) < 200)
@@ -229,6 +307,7 @@ void main(void)
         for (i = 8; i > 0; i--)
         {
             oneLedOn(i);
+            t1ou('B');
             
             t = millis();
             while((millis() - t) < 200)
