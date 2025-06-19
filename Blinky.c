@@ -56,6 +56,37 @@ uint32_t millis(void)
 }
 
 
+/* initDAC --- set up the dual 12-bit Digital-to-Analog Converter */
+
+static void initDAC(void)
+{
+    /// Connect GCLK1 to DAC
+    GCLK_REGS->GCLK_PCHCTRL[42] = GCLK_PCHCTRL_GEN(0x1U) | GCLK_PCHCTRL_CHEN_Msk;
+
+    while ((GCLK_REGS->GCLK_PCHCTRL[42] & GCLK_PCHCTRL_CHEN_Msk) != GCLK_PCHCTRL_CHEN_Msk)
+        ;
+    
+    // Main Clock setup to supply clock to DAC
+    MCLK_REGS->MCLK_APBDMASK |= MCLK_APBDMASK_DAC(1);
+    
+    // Set up I/O pins
+    PORT_REGS->GROUP[0].PORT_PMUX[1] = PORT_PMUX_PMUXE_B;
+    PORT_REGS->GROUP[0].PORT_PMUX[2] = PORT_PMUX_PMUXO_B;
+    PORT_REGS->GROUP[0].PORT_PINCFG[2] = PORT_PINCFG_PMUXEN(1);  // Vout0 on PA02 pin 3
+    PORT_REGS->GROUP[0].PORT_PINCFG[5] = PORT_PINCFG_PMUXEN(1);  // Vout1 on PA05 pin 14
+    
+    // Set up DAC registers
+    DAC_REGS->DAC_CTRLA = 0;
+    DAC_REGS->DAC_CTRLB = DAC_CTRLB_REFSEL_VDDANA | DAC_CTRLB_DIFF(0);
+    DAC_REGS->DAC_DACCTRL[0] = DAC_DACCTRL_DITHER(0) | DAC_DACCTRL_ENABLE(1);
+    DAC_REGS->DAC_DACCTRL[1] = DAC_DACCTRL_DITHER(0) | DAC_DACCTRL_ENABLE(1);
+    DAC_REGS->DAC_DATA[0] = 0;
+    DAC_REGS->DAC_DATA[1] = 0;
+    
+    DAC_REGS->DAC_CTRLA |= DAC_CTRLA_ENABLE(1);
+}
+
+
 /* initUARTs --- set up UART(s) and buffers */
 
 static void initUARTs(void)
@@ -238,6 +269,8 @@ void oneLedOn(const int led)
     PORT_REGS->GROUP[0].PORT_OUTCLR = PORT_PA18;
     PORT_REGS->GROUP[0].PORT_OUTCLR = PORT_PA15;
     
+    DAC_REGS->DAC_DATA[0] = led * 511;
+    
     switch (led)
     {
         case 0:
@@ -278,6 +311,7 @@ void main(void)
     
     initMCU();
     initUARTs();
+    initDAC();
     initMillisecondTimer();
     
     PORT_REGS->GROUP[0].PORT_DIRSET = PORT_PA00;    // LED pins to outputs
