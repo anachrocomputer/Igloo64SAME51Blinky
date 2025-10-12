@@ -257,6 +257,8 @@ static void initMCU(void)
 }
 
 
+/* oneLedOn --- light one LED and set the DAC output register */
+
 void oneLedOn(const int led)
 {
     PORT_REGS->GROUP[0].PORT_OUTCLR = PORT_PA00;
