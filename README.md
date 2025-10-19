@@ -24,10 +24,13 @@ VOUT0.
 | D9     |     32      | PA15 |
 | VOUT0  |     3       | PA02 |
 | VOUT1  |     14      | PA05 |
+| AIN6   |     15      | PA06 |
+| AIN7   |     16      | PA07 |
 | TxD    |     17      | PA08 |
 | RxD    |     18      | PA09 |
 
 GPIO pin assignments are by physical proximity on the PCB.
+ADC pin assignments attempt to avoid clashes with SERCOM pins.
 
 ## Compiling ##
 
