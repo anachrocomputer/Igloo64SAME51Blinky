@@ -56,6 +56,107 @@ uint32_t millis(void)
 }
 
 
+/* analogRead --- Arduino-like function to start a conversion, wait, and return result */
+
+uint16_t analogRead(const int channel)
+{
+    ADC0_REGS->ADC_INPUTCTRL = ADC_INPUTCTRL_MUXPOS(channel);   // Select ADC input channel
+    
+    ADC0_REGS->ADC_SWTRIG |= ADC_SWTRIG_START(1);   // Trigger ADC conversion
+    
+    while (ADC_SYNCBUSY_SWTRIG_Msk == (ADC0_REGS->ADC_SYNCBUSY & ADC_SYNCBUSY_SWTRIG_Msk))
+    {
+        ;   // Wait for sync
+    }
+    
+    while ((ADC0_REGS->ADC_INTFLAG & ADC_INTFLAG_RESRDY_Msk) == 0)
+    {
+        ;   // Wait for conversion complete
+    }
+    
+    return (uint16_t)(ADC0_REGS->ADC_RESULT & ADC_RESULT_RESULT_Msk);
+}
+
+
+#define ADC0_BIASCOMP_POS     (2u)
+#define ADC0_BIASCOMP_Msk     (0x7u << ADC0_BIASCOMP_POS)
+
+#define ADC0_BIASREFBUF_POS   (5u)
+#define ADC0_BIASREFBUF_Msk   (0x7u << ADC0_BIASREFBUF_POS)
+
+#define ADC0_BIASR2R_POS      (8u)
+#define ADC0_BIASR2R_Msk      (0x7u << ADC0_BIASR2R_POS)
+
+
+/* initADC --- set up one of the two ADCs */
+
+static void initADC(void)
+{
+    // Connect GCLK1 to ADC0
+    GCLK_REGS->GCLK_PCHCTRL[40] = GCLK_PCHCTRL_GEN(0x1U) | GCLK_PCHCTRL_CHEN_Msk;
+
+    while ((GCLK_REGS->GCLK_PCHCTRL[40] & GCLK_PCHCTRL_CHEN_Msk) != GCLK_PCHCTRL_CHEN_Msk)
+    {
+        ; // Wait for sync
+    }
+    
+    // Main Clock setup to supply clock to ADC0
+    MCLK_REGS->MCLK_APBDMASK |= MCLK_APBDMASK_ADC0(1);
+    
+    // Reset ADC0
+    ADC0_REGS->ADC_CTRLA |= (1u << ADC_CTRLA_SWRST_Pos);
+
+    while (ADC_SYNCBUSY_SWRST_Msk == (ADC0_REGS->ADC_SYNCBUSY & ADC_SYNCBUSY_SWRST_Msk))
+    {
+        ; // Wait for sync
+    }
+    
+    // Set up the pin mux for PA06 and PA07 as analog inputs
+    PORT_REGS->GROUP[0].PORT_PMUX[3] = PORT_PMUX_PMUXE_B | PORT_PMUX_PMUXO_B;
+    PORT_REGS->GROUP[0].PORT_PINCFG[6] = PORT_PINCFG_PMUXEN(1);  // PA06 AIN6 pin 15
+    PORT_REGS->GROUP[0].PORT_PINCFG[7] = PORT_PINCFG_PMUXEN(1);  // PA07 AIN7 pin 16
+    
+    PORT_REGS->GROUP[0].PORT_DIRCLR = PORT_PA06;    // PA06 AIN6 is an input pin
+    PORT_REGS->GROUP[0].PORT_DIRCLR = PORT_PA07;    // PA07 AIN7 is an input pin
+        
+    // Load factory cal values for ADC0
+    ADC0_REGS->ADC_CALIB = (uint16_t)((ADC_CALIB_BIASCOMP((((*(uint32_t*)SW0_ADDR) & ADC0_BIASCOMP_Msk) >> ADC0_BIASCOMP_POS)))
+                           | ADC_CALIB_BIASR2R((((*(uint32_t*)SW0_ADDR) & ADC0_BIASR2R_Msk) >> ADC0_BIASR2R_POS))
+                           | ADC_CALIB_BIASREFBUF(((*(uint32_t*)SW0_ADDR) & ADC0_BIASREFBUF_Msk)>> ADC0_BIASREFBUF_POS ));
+    
+    ADC0_REGS->ADC_CTRLA |= (2u << ADC_CTRLA_PRESCALER_Pos);       // Set up prescaler
+    
+    ADC0_REGS->ADC_CTRLB = ADC_CTRLB_RESSEL_12BIT;                 // Select 12 bit mode
+    
+    ADC0_REGS->ADC_INPUTCTRL = (0u << ADC_INPUTCTRL_MUXPOS_Pos)    // Positive MUX Input Selection
+                             | (0u << ADC_INPUTCTRL_DIFFMODE_Pos)  // Non-differential Mode
+                             | (24u << ADC_INPUTCTRL_MUXNEG_Pos)   // Negative MUX Input Selection
+                             | (0u << ADC_INPUTCTRL_DSEQSTOP_Pos); // Stop DMA Sequencing
+        
+    ADC0_REGS->ADC_REFCTRL = (3u << ADC_REFCTRL_REFSEL_Pos)        // Select VddAna reference
+                           | (0u << ADC_REFCTRL_REFCOMP_Pos);      // Enable Reference Buffer Offset Compensation
+    
+    ADC0_REGS->ADC_SAMPCTRL = (5u << ADC_SAMPCTRL_SAMPLEN_Pos)     // 5 cycles sampling time
+                            | (0u << ADC_SAMPCTRL_OFFCOMP_Pos);    // Enable Comparator Offset Compensation
+    
+    while(ADC_SYNCBUSY_Msk == (ADC0_REGS->ADC_SYNCBUSY & ADC_SYNCBUSY_Msk))
+    {
+        ; // Wait for sync
+    }
+    
+    //while (ADC0_REGS->ADC_SYNCBUSY & ADC_SYNCBUSY_ENABLE(1))
+    //    ;
+    
+    // Finally, enable ADC0
+    ADC0_REGS->ADC_CTRLA |= (1u << ADC_CTRLA_ENABLE_Pos);
+    
+    while (ADC_SYNCBUSY_ENABLE_Msk == (ADC0_REGS->ADC_SYNCBUSY & ADC_SYNCBUSY_ENABLE_Msk))
+    {
+        ; // Wait for sync
+    }
+}
+
+
 /* initDAC --- set up the dual 12-bit Digital-to-Analog Converter */
 
 static void initDAC(void)
@@ -310,9 +411,11 @@ void main(void)
 {
     uint32_t t;
     int i;
+    uint16_t ana;
     
     initMCU();
     initUARTs();
+    initADC();
     initDAC();
     initMillisecondTimer();
     
@@ -335,6 +438,9 @@ void main(void)
             oneLedOn(i);
             t1ou('A');
             
+            ana = analogRead(6);
+            printf(" AD6: %d ", ana);
+            
             t = millis();
             while((millis() - t) < 200)
                 ;
@@ -344,6 +450,9 @@ void main(void)
         {
             oneLedOn(i);
             t1ou('B');
+            
+            ana = analogRead(6);
+            printf(" AD6: %d ", ana);
             
             t = millis();
             while((millis() - t) < 200)
