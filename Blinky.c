@@ -13,14 +13,14 @@ volatile bool Tick = false;
 
 void TC3_Handler(void)
 {
+    // Acknowledge interrupt
+    TC3_REGS->COUNT16.TC_INTFLAG |= TC_INTFLAG_MC0(1);
+    
     Milliseconds++;
     Tick = true;
     
     //PORT_REGS->GROUP[1].PORT_OUTTGL = PORT_PB06;    // 500Hz on PB06
     //PORT_REGS->GROUP[0].PORT_OUTTGL = PORT_PA12;    // 500Hz on PA12
-
-    // Acknowledge interrupt
-    TC3_REGS->COUNT16.TC_INTFLAG |= TC_INTFLAG_MC0(1);
 }
 
 
