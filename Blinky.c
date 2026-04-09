@@ -161,8 +161,8 @@ static void initADC(void)
 
 static void initDAC(void)
 {
-    /// Connect GCLK1 to DAC
-    GCLK_REGS->GCLK_PCHCTRL[42] = GCLK_PCHCTRL_GEN(0x1U) | GCLK_PCHCTRL_CHEN_Msk;
+    /// Connect GCLK3 (1MHz) to DAC
+    GCLK_REGS->GCLK_PCHCTRL[42] = GCLK_PCHCTRL_GEN_GCLK3 | GCLK_PCHCTRL_CHEN(1);
 
     while ((GCLK_REGS->GCLK_PCHCTRL[42] & GCLK_PCHCTRL_CHEN_Msk) != GCLK_PCHCTRL_CHEN_Msk)
         ;
@@ -179,8 +179,8 @@ static void initDAC(void)
     // Set up DAC registers
     DAC_REGS->DAC_CTRLA = 0;
     DAC_REGS->DAC_CTRLB = DAC_CTRLB_REFSEL_VDDANA | DAC_CTRLB_DIFF(0);
-    DAC_REGS->DAC_DACCTRL[0] = DAC_DACCTRL_DITHER(0) | DAC_DACCTRL_ENABLE(1);
-    DAC_REGS->DAC_DACCTRL[1] = DAC_DACCTRL_DITHER(0) | DAC_DACCTRL_ENABLE(1);
+    DAC_REGS->DAC_DACCTRL[0] = DAC_DACCTRL_DITHER(0) | DAC_DACCTRL_CCTRL_CC100K | DAC_DACCTRL_REFRESH_REFRESH_3 | DAC_DACCTRL_ENABLE(1);
+    DAC_REGS->DAC_DACCTRL[1] = DAC_DACCTRL_DITHER(0) | DAC_DACCTRL_CCTRL_CC100K | DAC_DACCTRL_REFRESH_REFRESH_3 | DAC_DACCTRL_ENABLE(1);
     DAC_REGS->DAC_DATA[0] = 0;
     DAC_REGS->DAC_DATA[1] = 0;
     
@@ -355,6 +355,18 @@ static void initMCU(void)
     {
         /* Wait for Generator 1 synchronisation */
     }
+    
+    /* GCLK3 initialisation DFLL (48MHz) divide-by-48 giving 1MHz */
+    // GENCTRL3.DIV = 48    Divide-by-48
+    // GENCTRL3.DIVSEL = 0  Divide-by-GENTRL3.DIV
+    // GENCTRL3.SRC = 1     DFLL
+    // GENCTRL3.GENEN = 1   Enabled
+    GCLK_REGS->GCLK_GENCTRL[3] = GCLK_GENCTRL_DIV(48) | GCLK_GENCTRL_SRC_DFLL | GCLK_GENCTRL_GENEN(1);
+
+    while((GCLK_REGS->GCLK_SYNCBUSY & GCLK_SYNCBUSY_GENCTRL_GCLK3) == GCLK_SYNCBUSY_GENCTRL_GCLK3)
+    {
+        /* Wait for Generator 3 synchronisation */
+    }
 }
 
 
@@ -439,6 +451,7 @@ void main(void)
             t1ou('A');
             
             ana = analogRead(6);
+            DAC_REGS->DAC_DATA[1] = ana;
             printf(" AD6: %d ", ana);
             
             t = millis();
@@ -453,6 +466,7 @@ void main(void)
             
             ana = analogRead(6);
             printf(" AD6: %d ", ana);
+            DAC_REGS->DAC_DATA[1] = ana;
             
             t = millis();
             while((millis() - t) < 200)
